@@ -1,40 +1,43 @@
-services:
-  postgres:
-    image: postgres:16
-    container_name: postgres_db
-    environment:
-      POSTGRES_USER: student
-      POSTGRES_PASSWORD: student
-      POSTGRES_DB: mydb
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+# Week 2 — Postgres + pgAdmin stack.
+# See week02/docs/week2_docker.md for the deep dive on each key.
+
+services:                                    # block defining all containers in this stack
+  postgres:                                  # service name; also the DNS hostname other containers use ("postgres")
+    image: postgres:16                       # build container from the official Postgres 16 image on Docker Hub
+    container_name: postgres_db              # fixed container name — easy `docker logs postgres_db` / `docker exec`
+    environment:                             # env vars set inside the container at startup
+      POSTGRES_USER: student                 # creates a superuser called "student" on first run
+      POSTGRES_PASSWORD: student             # password for that user (throwaway lab credential)
+      POSTGRES_DB: mydb                      # creates an empty database called "mydb" owned by "student"
+    volumes:                                 # mount persistent storage into the container
+      - postgres_data:/var/lib/postgresql/data  # named volume → Postgres data dir; survives `docker compose down`
+    ports:                                   # publish container ports to your laptop
+      - "5432:5432"                          # host:container — connect from laptop with `psql -h localhost -p 5432`
+    healthcheck:                             # how Docker decides if Postgres is "ready", not just "running"
+      test: ["CMD-SHELL", "pg_isready -U student"]  # `pg_isready` exits 0 when Postgres accepts connections
+      interval: 10s                          # run the check every 10 seconds
+      timeout: 5s                            # if a single check takes >5s, treat it as a failure
+      retries: 5                             # mark unhealthy only after 5 consecutive failures
+    networks:                                # which Docker networks this container is attached to
+      - postgres_network                     # joins the shared bridge network defined below
+
+  pgadmin:                                   # second service — web UI for managing Postgres
+    image: dpage/pgadmin4:8.13               # community-maintained pgAdmin 4 image, version 8.13
+    container_name: pgadmin                  # fixed name for `docker logs pgadmin` etc.
+    environment:                             # initial-admin credentials for the pgAdmin web UI
+      PGADMIN_DEFAULT_EMAIL: student@student.com   # login email for http://localhost:8123
+      PGADMIN_DEFAULT_PASSWORD: student      # login password (throwaway lab credential)
     ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U student"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - "8123:80"                            # pgAdmin listens on :80 inside; reachable on host at :8123
+    depends_on:                              # startup ordering — don't launch pgAdmin until...
+      postgres:                              #   ...the "postgres" service...
+        condition: service_healthy           #   ...has its healthcheck passing (not just process started)
     networks:
-      - postgres_network
+      - postgres_network                     # same network as Postgres so pgAdmin can resolve "postgres" by name
 
-  pgadmin:
-    image: dpage/pgadmin4:8.13
-    container_name: pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: student@student.com
-      PGADMIN_DEFAULT_PASSWORD: student
-    ports:
-      - "8123:80"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - postgres_network
+networks:                                    # top-level: declare the networks used above
+  postgres_network:                          # the one network used by both services
+    driver: bridge                           # standard single-host virtual switch (Docker default)
 
-networks:
-  postgres_network:
-    driver: bridge
-
-volumes:
-  postgres_data:
+volumes:                                     # top-level: declare named volumes used above
+  postgres_data:                             # Docker manages where this lives on disk; deleted only by `down -v`

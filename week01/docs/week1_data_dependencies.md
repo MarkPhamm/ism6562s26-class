@@ -2,7 +2,7 @@
 
 Concepts and a code walkthrough for `lab/ism6562-week01-lab2.ipynb`.
 
-> **Prerequisite:** read `week1_lab1.md` first. This lab assumes you understand cores, processes, the GIL, and `multiprocess.Pool`.
+> **Prerequisite:** read `week1_gil_and_multiprocessing.md` first. This lab assumes you understand cores, processes, the GIL, and `multiprocess.Pool`.
 
 ---
 
